@@ -1,0 +1,704 @@
+<title>GooRoo RCS Análise de Fluxo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: capa azul Blip, navegação fixa por seção, leitura em coluna única de ~1080px com tabelas e mockups de celular. */
+:root{
+  --bg:#f4f6f9; --surface:#ffffff; --surface-2:#eef2f9; --fg:#1f2430; --muted:#5b6475;
+  --line:rgba(20,40,90,.14); --primary:#1e6bf1; --primary-deep:#052f91; --primary-strong:#052f91; --brand:#00c3ff;
+  --hero-a:#031b54; --hero-b:#0056c6; --on-hero:#ffffff;
+  --ok:#00794a; --ok-bg:#e1f5ec; --warn:#9a5700; --warn-bg:#fdf0d9; --bad:#b42323; --bad-bg:#fbe5e5;
+  --info:#1e56c0; --info-bg:#e4edfd; --code-bg:#eef2f9; --bubble:#e9edf5; --phone:#dfe5f1;
+  --font:'Nunito Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1220; --surface:#151b2e; --surface-2:#1c2440; --fg:#e6eaf4; --muted:#9aa6c0;
+  --line:rgba(190,205,245,.16); --primary:#6c9dff; --primary-deep:#9bbcff; --primary-strong:#0b3a8f; --brand:#00c3ff;
+  --hero-a:#050c24; --hero-b:#0b3a8f;
+  --ok:#4fd6a0; --ok-bg:#12352a; --warn:#f2b45a; --warn-bg:#3a2a0f; --bad:#ff8a8a; --bad-bg:#3d1717;
+  --info:#8fb3ff; --info-bg:#172a54; --code-bg:#1c2440; --bubble:#232c48; --phone:#10162a;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1220; --surface:#151b2e; --surface-2:#1c2440; --fg:#e6eaf4; --muted:#9aa6c0;
+  --line:rgba(190,205,245,.16); --primary:#6c9dff; --primary-deep:#9bbcff; --primary-strong:#0b3a8f; --brand:#00c3ff;
+  --hero-a:#050c24; --hero-b:#0b3a8f;
+  --ok:#4fd6a0; --ok-bg:#12352a; --warn:#f2b45a; --warn-bg:#3a2a0f; --bad:#ff8a8a; --bad-bg:#3d1717;
+  --info:#8fb3ff; --info-bg:#172a54; --code-bg:#1c2440; --bubble:#232c48; --phone:#10162a;
+  color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+[id]{scroll-margin-top:calc(70px + env(safe-area-inset-top,0px))}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.6;margin:0}
+.gut{padding-left:max(16px,5vw,env(safe-area-inset-left,0px));padding-right:max(16px,5vw,env(safe-area-inset-right,0px))}
+.in{max-width:1080px;margin:0 auto}
+a{color:var(--primary)}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px;border-radius:4px}
+code{font-family:var(--mono);font-size:.88em;background:var(--code-bg);padding:1px 6px;border-radius:5px;overflow-wrap:anywhere}
+h1,h2,h3,h4{text-wrap:balance;line-height:1.2;margin:0}
+p{margin:0}
+
+/* header */
+.header{background:linear-gradient(135deg,var(--hero-a) 0%,var(--hero-b) 100%);color:#fff;position:relative;overflow:hidden;padding-block:44px 48px}
+.header::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,rgba(0,195,255,.15) 0%,transparent 55%);pointer-events:none}
+.header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;flex-wrap:wrap;gap:14px;position:relative}
+.header-logos{display:flex;align-items:center;gap:18px}
+.wordmark{font-size:24px;font-weight:800;letter-spacing:-.02em}
+.header-logos .divider{height:22px;width:1px;background:rgba(255,255,255,.25)}
+.client-pill{font-size:15px;font-weight:800;letter-spacing:.04em;border:1px solid rgba(255,255,255,.4);border-radius:8px;padding:6px 14px}
+.header-badge{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:6px 16px}
+.header-main{max-width:980px;position:relative}
+.header-eyebrow{font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
+.header-headline{font-size:clamp(28px,4vw,48px);font-weight:800;line-height:1.1;letter-spacing:-.02em;margin-bottom:18px}
+.header-headline .line2{color:var(--brand)}
+.header-summary{font-size:15px;line-height:1.6;color:rgba(255,255,255,.9);max-width:800px;margin-bottom:28px}
+.header-summary strong{color:#fff}
+.header-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.2);border-radius:14px;overflow:hidden;position:relative}
+.kpi-item{padding:18px;text-align:center;position:relative}
+.kpi-item+.kpi-item::before{content:'';position:absolute;left:0;top:16px;bottom:16px;width:1px;background:rgba(255,255,255,.18)}
+.kpi-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.8);margin-bottom:8px}
+.kpi-value{font-size:34px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.kpi-value.accent{color:var(--brand)}
+.kpi-sub{font-size:11px;color:rgba(255,255,255,.72);margin-top:6px}
+
+/* tabs */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--surface-2)}
+.nav-wrap{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--surface-2);border-bottom:1px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.nav-tabs{display:flex;padding-left:max(16px,5vw,env(safe-area-inset-left,0px));padding-right:max(16px,5vw,env(safe-area-inset-right,0px));overflow-x:auto;scrollbar-width:thin}
+.nav-tab{appearance:none;background:none;border:none;border-bottom:3px solid transparent;font-family:inherit;padding:0 20px;height:58px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap;transition:color .2s,background .2s}
+.nav-tab:hover{color:var(--primary)}
+.nav-tab[aria-selected="true"]{color:var(--primary);border-bottom-color:var(--primary);background:var(--surface)}
+.nav-tab .n{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:var(--line);font-size:11px;margin-right:8px;color:var(--fg)}
+.nav-tab[aria-selected="true"] .n{background:var(--primary);color:#fff}
+
+/* sections */
+.page{background:var(--surface);min-height:60vh}
+.tab-panel{display:none}.tab-panel.active{display:block}
+.section{padding-block:44px 48px;border-bottom:1px solid var(--line)}
+.section:last-child{border-bottom:none}
+.in{max-width:1240px;margin:0 auto}
+.sh{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sh-num{width:24px;height:24px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sh-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
+.section h2{font-size:clamp(23px,3vw,27px);font-weight:800;letter-spacing:-.01em;margin-bottom:8px;line-height:1.15}
+.sub{font-size:14px;line-height:1.6;color:var(--muted);margin-bottom:24px;max-width:860px}
+h3{font-size:16px;font-weight:800;margin:30px 0 12px;color:var(--primary-deep)}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px}
+.toc button{appearance:none;border:none;font-family:inherit;cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);background:var(--info-bg);border-radius:999px;padding:6px 14px}
+.toc button:hover{filter:brightness(.95)}
+.more{appearance:none;background:none;border:none;font-family:inherit;font-size:12px;font-weight:800;color:var(--primary);cursor:pointer;padding:0;margin-top:12px;display:inline-block}
+.more:hover{text-decoration:underline}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--primary)}100%{box-shadow:0 0 0 3px transparent}}
+.callout{border-left:5px solid var(--primary);background:var(--info-bg);padding:16px 20px;border-radius:0 10px 10px 0;font-size:15px;line-height:1.55;font-weight:700;color:var(--primary-deep)}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{background:var(--primary-strong);color:#fff;font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:13px 14px;text-align:left;white-space:nowrap}
+td{padding:12px 14px;vertical-align:top;line-height:1.5;border-bottom:1px solid var(--line)}
+tbody tr:hover{background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:800}
+.wide{min-width:880px}.mid{min-width:680px}
+.filter{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.filter input{flex:1;min-width:220px;font:inherit;font-size:13px;padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.filter input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,107,241,.15)}
+.q{}
+
+/* cards, tags, notes */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;min-width:0;box-shadow:0 2px 8px rgba(0,0,0,.03);transition:border-color .25s,box-shadow .25s}
+.card:hover{border-color:var(--primary);box-shadow:0 6px 18px rgba(30,107,241,.12)}
+.card h4{font-size:15px;font-weight:800;color:var(--primary-deep);margin-bottom:8px;line-height:1.3}
+.card p,.card li{font-size:13px;line-height:1.55}
+.card ul{margin:6px 0 0;padding-left:18px}
+.note{border-radius:10px;padding:16px 18px;font-size:13px;line-height:1.6;background:var(--info-bg);border:1px solid var(--line);margin-block:18px}
+.note b:first-child{color:var(--info)}
+.note.warn{background:var(--warn-bg)}.note.warn b:first-child{color:var(--warn)}
+.note.bad{background:var(--bad-bg)}.note.bad b:first-child{color:var(--bad)}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:2px 8px;white-space:nowrap;vertical-align:1px;margin-right:2px}
+.t-ok{background:var(--ok-bg);color:var(--ok)}.t-warn{background:var(--warn-bg);color:var(--warn)}
+.t-bad{background:var(--bad-bg);color:var(--bad)}.t-info{background:var(--info-bg);color:var(--info)}
+.t-gray{background:var(--surface-2);color:var(--muted)}
+.rota{font-family:var(--mono);font-size:11px;background:var(--surface-2);color:var(--primary-deep);border-radius:6px;padding:2px 7px;white-space:nowrap}
+.card p,.card li,.cols p,.cols li{overflow-wrap:anywhere}
+
+/* AS IS phases */
+.phases{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.ph{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.ph h4{font-size:15px;font-weight:800;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ph h4 i{font-style:normal;font-family:var(--mono);font-size:12px;background:var(--primary);color:#fff;border-radius:6px;padding:1px 8px}
+.st{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px dashed var(--line);font-size:14px}
+.st:first-of-type{border-top:0}
+.st .n{font-family:var(--mono);font-size:11.5px;font-weight:700;min-width:42px;color:var(--muted);padding-top:2px}
+.st .b{flex:1;min-width:0}.st .b small{display:block;color:var(--muted);font-size:12.5px;line-height:1.4}
+.dec{margin-top:8px;font-size:13px;background:var(--warn-bg);color:var(--fg);border-radius:8px;padding:8px 10px}
+.dec b{color:var(--warn)}
+
+/* context switch strip */
+.strip{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.sw{flex:1 1 130px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13.5px;position:relative}
+.sw b{display:block;font-size:14.5px}.sw span{color:var(--muted);font-size:12.5px;display:block;margin-top:2px}
+.sw.out{border-color:var(--bad);background:var(--bad-bg)}
+.sw.home{border-color:var(--ok)}
+
+/* phone mockups */
+.mocks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px;align-items:start}
+.mk{min-width:0}
+.mk figcaption{font-size:13.5px;color:var(--muted);margin-top:8px}
+.mk figcaption b{color:var(--fg)}
+.phone{background:var(--phone);border:1px solid var(--line);border-radius:26px;padding:14px 12px 16px;max-width:340px;margin:0 auto}
+.phone .hd{display:flex;align-items:center;gap:8px;padding:2px 4px 10px;font-size:13px;font-weight:800}
+.phone .av{width:26px;height:26px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:11px}
+.phone .ok{font-size:11px;color:var(--ok);font-weight:700}
+.bub{background:var(--bubble);border-radius:16px 16px 16px 4px;padding:10px 12px;font-size:13.5px;line-height:1.45;margin-bottom:8px;max-width:92%}
+.rc{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:8px;font-size:13px}
+.rc .img{height:64px;background:linear-gradient(120deg,var(--primary),var(--brand));color:#fff;display:flex;align-items:center;padding:0 14px;font-weight:800;font-size:12.5px;letter-spacing:.04em}
+.rc .tx{padding:10px 12px}.rc .tx b{display:block;font-size:14.5px;margin-bottom:2px}
+.rc .tx div{color:var(--muted);line-height:1.45}
+.rc .bt{display:block;text-align:center;border-top:1px solid var(--line);padding:8px;color:var(--primary);font-weight:800}
+.car{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px}
+.car .rc{flex:0 0 78%;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.chip{border:1px solid var(--primary);color:var(--primary);border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:700;background:var(--surface)}
+
+/* TO BE blocks */
+.tb{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:18px;min-width:0}
+.tb header{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-bottom:12px}
+.tb header h3{margin:0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px}
+.cols h5{margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cols ul{margin:0;padding-left:20px;font-size:15px}.cols li{margin-bottom:5px}
+.cols p{font-size:15px}
+pre{background:var(--code-bg);border-radius:10px;padding:14px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.55;margin:10px 0 0}
+.btn{font:inherit;font-weight:700;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--primary);border-radius:8px;padding:5px 12px;cursor:pointer;margin-top:8px}
+.btn:hover{background:var(--surface-2)}
+
+/* ladder */
+.ladder{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px}
+.lad{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.lad b.t{font-size:22px;font-weight:800;color:var(--primary);font-variant-numeric:tabular-nums;display:block}
+
+/* limits */
+.lim{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px}
+.lim div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:14px}
+.lim b{display:block;font-size:20px;color:var(--primary);font-variant-numeric:tabular-nums}
+
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.two .card h4.y{color:var(--ok)}.two .card h4.n{color:var(--bad)}
+.two li{margin-bottom:5px}
+
+footer.ft{margin-top:56px;padding-block:28px 40px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+.to-top{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:55;background:var(--primary);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s}
+.to-top.on{opacity:1;pointer-events:auto}
+.footer{background:var(--primary-strong);color:#fff;padding-block:26px;font-size:12.5px;line-height:1.55}
+.footer .in{color:rgba(255,255,255,.85)}
+</style>
+<header class="header gut">
+ <div class="header-top">
+  <div class="header-logos"><span class="wordmark">blip</span><div class="divider"></div><span class="client-pill">GooRoo Crédito</span></div>
+  <div class="header-badge">Service Design · RCS</div>
+ </div>
+ <div class="header-main">
+  <div class="header-eyebrow">GooRoo · Crédito do Trabalhador · Autocontratação via RCS</div>
+  <h1 class="header-headline"><div>Um fluxo desenhado para WhatsApp.</div><div class="line2">11 rotas, 6 trocas de app, 1 minuto para assinar.</div><div>Redesenho nativo para RCS.</div></h1>
+  <p class="header-summary">Análise do fluxo <strong>AS IS</strong> exportado do mapa MindMeister, com <strong>diagnóstico de canal</strong>, régua do que o <strong>RCS Business Messaging</strong> realmente suporta e proposta <strong>TO BE em 6 fases</strong>, com mockups, priorização e plano de medição.</p>
+  <div class="header-kpis">
+   <div class="kpi-item"><div class="kpi-label">Rotas de API</div><div class="kpi-value">11</div><div class="kpi-sub">ROTA 1 a 10, com 6a e 6b</div></div>
+   <div class="kpi-item"><div class="kpi-label">Trocas de app</div><div class="kpi-value accent">6</div><div class="kpi-sub">RCS, SMS, navegador, WhatsApp</div></div>
+   <div class="kpi-item"><div class="kpi-label">Timeout de assinatura</div><div class="kpi-value accent">1 min</div><div class="kpi-sub">no AS IS, passo 16.B</div></div>
+   <div class="kpi-item"><div class="kpi-label">WhatsApp Flows</div><div class="kpi-value">2</div><div class="kpi-sub">cadastro básico e complementar</div></div>
+  </div>
+ </div>
+</header>
+<div class="nav-wrap"><div class="nav-tabs" role="tablist" aria-label="Seções do relatório"><button class="nav-tab" role="tab" id="tab-resumo" data-tab="resumo" aria-controls="panel-resumo"><span class="n">1</span>Resumo</button><button class="nav-tab" role="tab" id="tab-fluxo" data-tab="fluxo" aria-controls="panel-fluxo"><span class="n">2</span>Fluxo AS IS</button><button class="nav-tab" role="tab" id="tab-diagnostico" data-tab="diagnostico" aria-controls="panel-diagnostico"><span class="n">3</span>Diagnóstico e canal</button><button class="nav-tab" role="tab" id="tab-tobe" data-tab="tobe" aria-controls="panel-tobe"><span class="n">4</span>Redesenho TO BE</button><button class="nav-tab" role="tab" id="tab-priorizacao" data-tab="priorizacao" aria-controls="panel-priorizacao"><span class="n">5</span>Priorização e medição</button><button class="nav-tab" role="tab" id="tab-riscos" data-tab="riscos" aria-controls="panel-riscos"><span class="n">6</span>Riscos e ajustes</button></div></div>
+<div class="page" id="pg">
+<section class="tab-panel" id="panel-resumo" role="tabpanel" aria-labelledby="tab-resumo"><div class="section" id="resumo"><div class="in">
+ <div class="sh"><div class="sh-num">1</div><div class="sh-eyebrow">Resumo executivo</div></div>
+ <h2>A regra de crédito está sólida. O canal é o problema.</h2>
+ <p class="sub">A esteira cobre compliance (parceria BRP, IOF, CET, seguro prestamista), biometria e assinatura Clicksign. O desenho, porém, nasceu para WhatsApp e foi levado ao RCS sem adaptação.</p>
+ <div class="grid2">
+  <div class="card"><h4><span class="tag t-bad">Crítico</span> O que quebra no RCS</h4>
+   <ul>
+    <li>Token de assinatura chega no WhatsApp da Clicksign.</li>
+    <li>Passo 14 configura o canal do token como WhatsApp.</li>
+    <li>Cadastro depende de WhatsApp Flows, recurso exclusivo da Meta.</li>
+    <li>Timeout de 1 minuto na assinatura.</li>
+   </ul><button class="more" type="button" data-go="diagnostico/diagnostico">Ver diagnóstico →</button></div>
+  <div class="card"><h4><span class="tag t-ok">Oportunidade</span> O que o RCS entrega</h4>
+   <ul>
+    <li>Carrossel de ofertas por empregador.</li>
+    <li>Rich Card de resumo com até 4 botões.</li>
+    <li>Link que abre dentro do app de mensagens (webview) para o cadastro.</li>
+    <li>Ligar para o suporte com um toque.</li>
+    <li>Remetente verificado, com logo e nome da marca.</li>
+   </ul><button class="more" type="button" data-go="tobe/fase1">Ver redesenho →</button></div>
+ </div>
+ <div class="note"><b>Como ler este documento.</b> As etiquetas <span class="tag t-info">Relatório</span> marcam o que veio da análise original. <span class="tag t-ok">Complemento</span> marca o que foi adicionado aqui. Itens que dependem de teste ou de confirmação com agregador, Clicksign ou GooRoo levam <span class="tag t-warn">Validar</span>.</div>
+</div></div></section>
+<section class="tab-panel" id="panel-fluxo" role="tabpanel" aria-labelledby="tab-fluxo"><div class="section" id="asis"><div class="in">
+ <div class="sh"><div class="sh-num">2</div><div class="sh-eyebrow">Fluxo AS IS</div></div>
+ <h2>A jornada atual, em 7 etapas</h2>
+ <p class="sub">Reconstituição do mapa exportado, com rotas de API, variáveis dinâmicas e regras originais preservadas. O detalhamento de cada bloco, com a copy exata, está no inventário logo abaixo.</p><nav class="toc" aria-label="Neste capítulo"><button type="button" data-go="fluxo/asis">Fases do fluxo</button><button type="button" data-go="fluxo/inventario">Inventário de blocos</button></nav>
+ <div class="phases">
+  <div class="ph"><h4><i>A</i> Oferta e personalização</h4>
+   <div class="st"><span class="n">0</span><div class="b">Início<small>Entram <code>Telefone</code> e <code>CPF</code> como variáveis de sessão.</small></div></div>
+   <div class="st"><span class="n">1</span><div class="b">Obter ofertas rápidas <span class="rota">ROTA 1</span><small>Identifica quantos vínculos o tomador tem e a oferta máxima.</small></div></div>
+   <div class="st"><span class="n">1.A</span><div class="b">Vários empregadores: escolha da empresa e oferta<small>Botões Empregador 1, 2, 3 e Voltar.</small></div></div>
+   <div class="st"><span class="n">1.B</span><div class="b">Um empregador: oferta única<small>Contratar, Alterar Oferta, Voltar.</small></div></div>
+   <div class="st"><span class="n">2, 3</span><div class="b">Alterar valor e parcelas <span class="rota">ROTA 1</span><small>Passos 19 e 20 repetem a lógica para oferta única.</small></div></div>
+   <div class="st"><span class="n">18</span><div class="b">Termos de condições <span class="rota">ROTA 1 em ajuste</span><small>5 blocos: IOF, juros, CET, carência, seguro prestamista.</small></div></div>
+   <div class="dec"><b>Decisão:</b> mais de um contrato leva à escolha de empresa. Apenas um vai direto à oferta.</div>
+  </div>
+  <div class="ph"><h4><i>B</i> Cadastro e identificação</h4>
+   <div class="st"><span class="n">4, 5</span><div class="b">Verificar existência de tomador <span class="rota">ROTA 2</span><small>Consulta a base GooRoo por CPF.</small></div></div>
+   <div class="st"><span class="n">Flows</span><div class="b">Cadastro básico<small>Nome completo, e-mail, data de nascimento.</small></div></div>
+   <div class="st"><span class="n">Conf</span><div class="b">Confirmação do telefone<small>Usar este número ou informar outro.</small></div></div>
+   <div class="st"><span class="n">6</span><div class="b">Cadastrar novo tomador <span class="rota">ROTA 3</span><small>Erro leva a atendente humano.</small></div></div>
+   <div class="st"><span class="n">Wait</span><div class="b">Balão "Aguarde um momento"<small>Mensagem estática de espera.</small></div></div>
+   <div class="dec"><b>Decisão:</b> com cadastro segue para ajuste de oferta (passos 21 e 22). Sem cadastro percorre este bloco.</div>
+  </div>
+  <div class="ph"><h4><i>C</i> Autenticação OTP</h4>
+   <div class="st"><span class="n">7</span><div class="b">Iniciar login via OTP <span class="rota">ROTA 4</span><small>Código por SMS. Botões Recebi e Não Recebi.</small></div></div>
+   <div class="st"><span class="n">8</span><div class="b">Validar token <span class="rota">ROTA 5</span><small>Autentica a sessão do tomador na API.</small></div></div>
+   <div class="dec"><b>Decisão:</b> "Não recebi" volta ao passo 7 e reenvia.</div>
+  </div>
+  <div class="ph"><h4><i>D</i> Proposta e dados</h4>
+   <div class="st"><span class="n">9a</span><div class="b">Criar proposta <span class="rota">ROTA 6a</span><small>Gerada a partir da simulação aprovada.</small></div></div>
+   <div class="st"><span class="n">OptIn</span><div class="b">Condições do empréstimo<small>Continuar ou Ver Termos. Tag <code>OFFERS OPT_IN</code>.</small></div></div>
+   <div class="st"><span class="n">Flows</span><div class="b">Cadastro complementar<small>Pessoais, residenciais e bancários em tela única.</small></div></div>
+   <div class="st"><span class="n">9b</span><div class="b">Atualizar dados <span class="rota">ROTA 6b em ajuste</span><small>Persiste os dados completos na proposta.</small></div></div>
+  </div>
+  <div class="ph"><h4><i>E</i> Documentos</h4>
+   <div class="st"><span class="n">Doc</span><div class="b">Escolha do tipo<small>RG antigo, RG novo, RG digital, CNH, CNH digital.</small></div></div>
+   <div class="st"><span class="n">10, 11</span><div class="b">Foto frente e verso <span class="rota">ROTA 7</span><small>Para RG antigo, RG novo e CNH.</small></div></div>
+   <div class="st"><span class="n">17</span><div class="b">Documento em PDF <span class="rota">ROTA 7</span><small>Para RG digital e CNH digital.</small></div></div>
+   <div class="st"><span class="n">12</span><div class="b">Comprovante de renda <span class="rota">ROTA 7</span><small>Holerite ou contracheque, até 30 dias, JPEG/PNG/PDF até 5MB.</small></div></div>
+  </div>
+  <div class="ph"><h4><i>F</i> Revisão, biometria e assinatura</h4>
+   <div class="st"><span class="n">13</span><div class="b">Revisão final <span class="rota">ROTA 8</span><small>Após confirmar, nada mais pode ser alterado.</small></div></div>
+   <div class="st"><span class="n">14</span><div class="b">Formalização <span class="rota">ROTA 9</span><small>Esteira de qualidade. Canal do token definido como WhatsApp.</small></div></div>
+   <div class="st"><span class="n">Info</span><div class="b">Parceria BRP e suporte<small>Tel (11) 4003-7876, Whats (11) 5039-6825, e-mail, 09h às 18h.</small></div></div>
+   <div class="st"><span class="n">15</span><div class="b">Validação facial por link <span class="rota">ROTA 10</span><small>Erro leva a atendente humano.</small></div></div>
+   <div class="st"><span class="n">16</span><div class="b">Assinatura Clicksign por link <span class="rota">ROTA 10</span><small>Código de 6 dígitos chega no WhatsApp da Clicksign.</small></div></div>
+  </div>
+  <div class="ph"><h4><i>G</i> Conclusão</h4>
+   <div class="st"><span class="n">16.A</span><div class="b">Contrato assinado<small>Aguarda aprovação do time de crédito. Link para o painel do cliente.</small></div></div>
+   <div class="st"><span class="n">16.B</span><div class="b">Timeout de 1 minuto <span class="rota">ROTA 10</span><small>Reenvia instruções da Clicksign e botão Prosseguir.</small></div></div>
+  </div>
+ </div>
+ <h3>Onde o usuário sai do chat</h3>
+ <div class="strip">
+  <div class="sw home"><b>1. Chat RCS</b><span>Oferta, cadastro, documentos</span></div>
+  <div class="sw out"><b>2. SMS</b><span>Código OTP (passo 7)</span></div>
+  <div class="sw out"><b>3. Navegador</b><span>Validação facial (passo 15)</span></div>
+  <div class="sw out"><b>4. Navegador</b><span>Contrato Clicksign (passo 16)</span></div>
+  <div class="sw out"><b>5. WhatsApp</b><span>Código de 6 dígitos da Clicksign</span></div>
+  <div class="sw home"><b>6. Chat RCS</b><span>Volta para clicar em Prosseguir</span></div>
+ </div>
+</div></div><div class="section" id="inventario"><div class="in">
+ <div class="sh"><div class="sh-num">2</div><div class="sh-eyebrow">Inventário AS IS</div></div>
+ <h2>Bloco a bloco, com a copy original</h2>
+ <p class="sub">Variáveis como <code>{{1}}</code> são dinâmicas e vêm das rotas de API. Use a busca para achar passo, rota ou trecho de texto.</p>
+ <div class="filter"><input id="q" type="search" placeholder="Buscar por passo, rota ou texto (ex.: ROTA 7, OTP, seguro)" aria-label="Buscar no inventário"></div>
+ <div class="tw"><table class="wide" id="inv">
+  <thead><tr><th>Passo</th><th>Bloco</th><th>Rota de API</th><th>Mensagem / conteúdo</th><th>Entradas / botões</th></tr></thead>
+  <tbody>
+   <tr><td class="num">0</td><td><b>Inicialização</b></td><td>Variáveis de sessão</td><td>Armazena variáveis de entrada: <code>Telefone</code>, <code>CPF</code>.</td><td>Início automático da esteira.</td></tr>
+   <tr><td class="num">1</td><td><b>Consulta de ofertas</b></td><td><span class="rota">ROTA 1</span> Obter ofertas rápidas por CPF</td><td>Identifica se o tomador tem 1 ou mais vínculos empregatícios e a oferta máxima.</td><td>Roteamento: mais de um contrato vs. apenas um contrato.</td></tr>
+   <tr><td class="num">1.A</td><td><b>Seleção de empregador (multi)</b></td><td>Interno</td><td>"Por favor, escolha a empresa onde deseja que o desconto do seu Crédito do Trabalhador seja aplicado."</td><td>[Empregador 1], [Empregador 2], [Empregador 3], [Voltar]. Dados: Empregador {{2}}, Receba {{3}}, {{4}}x R${{5}}.</td></tr>
+   <tr><td class="num">1.A.1</td><td><b>Apresentação da oferta (multi)</b></td><td>Interno</td><td>"Pela empresa selecionada, o valor da sua oferta liberado para contratação é de até {{1}}.<br>Empregador: {{2}}<br>Receba: {{3}}<br>Pague em: {{4}}x de R$ {{5}}<br>Para prosseguir com o valor, clique em 'Continuar'."</td><td>[Contratar Oferta], [Alterar Valor], [Alterar Parcelas], [Voltar].</td></tr>
+   <tr><td class="num">2</td><td><b>Alteração de valor</b></td><td><span class="rota">ROTA 1</span></td><td>"Você pode contratar até {{1}} no seu Crédito do Trabalhador. Por favor, informe o valor que deseja contratar."<br>Retorno: "Você personalizou o valor da sua oferta. Confira o resumo: Empregador: {{1}}, CNPJ: {{2}}, Valor a receber: {{3}}, Pagamento: {{4}}x de {{5}}"</td><td>Texto livre (valor monetário). Botões: [Contratar Oferta], [Alterar Oferta], [Alterar Parcelas], [Voltar].</td></tr>
+   <tr><td class="num">3</td><td><b>Alteração de parcelas</b></td><td><span class="rota">ROTA 1</span></td><td>"Você escolheu o valor de {{1}}. Agora, por favor, escolha a quantidade de parcelas."</td><td>[Parcelas 1], [Parcelas 2], [Parcelas 3].</td></tr>
+   <tr><td class="num">1.B</td><td><b>Oferta única (mono)</b></td><td>Interno</td><td>"Aqui está a sua oferta com valor de até {{1}} liberado para contratar.<br>Empregador: {{2}}<br>Receba: {{3}}<br>Pague em: {{4}}x de R$ {{5}}"</td><td>[Contratar Oferta], [Alterar Oferta], [Voltar].</td></tr>
+   <tr><td class="num">19, 20</td><td><b>Ajuste de oferta (mono)</b></td><td><span class="rota">ROTA 1</span></td><td>Mesma lógica de pedir valor e escolher parcelas dos passos 2 e 3.</td><td>Entrada de valor e botões de parcelas.</td></tr>
+   <tr><td class="num">18</td><td><b>Termos de condições</b></td><td><span class="rota">ROTA 1</span> <span class="tag t-warn">EM AJUSTE</span></td><td>5 blocos modulares:<br>1. IOF (R$ 327,38)<br>2. Taxa de juros (7,99% a.m. / 151,53% a.a.)<br>3. CET (10,75% a.m. / 187,63% a.a.)<br>4. Carência (76 dias)<br>5. Seguro prestamista (R$ {{1}})</td><td>Por termo: [Continuar], [Outros Termos e Condições], [Voltar]. Termo 5: [Continuar com Seguro], [Continuar sem Seguro].</td></tr>
+   <tr><td class="num">4, 5</td><td><b>Checagem de cadastro</b></td><td><span class="rota">ROTA 2</span> Verificar existência de tomador por CPF</td><td>Verifica se o tomador existe na base GooRoo.</td><td>Bifurcação: tem cadastro (passos 21 e 22) vs. não tem cadastro.</td></tr>
+   <tr><td class="num">Flows</td><td><b>Cadastro básico</b></td><td>Plataforma conversacional</td><td>Formulário estruturado: nome completo, e-mail, data de nascimento.</td><td>[Próximo], [Voltar].</td></tr>
+   <tr><td class="num">Conf</td><td><b>Confirmação de telefone</b></td><td>Interno</td><td>"O número que está entrando em contato é {{1}}. Deseja prosseguir com ele para a sua contratação ou prefere informar um novo número?"<br>Se alterar: "Por favor, informe o seu número de telefone."</td><td>[Usar este número], [Alterar número].</td></tr>
+   <tr><td class="num">6</td><td><b>Criação de tomador</b></td><td><span class="rota">ROTA 3</span> Cadastrar novo tomador</td><td>Envia os dados cadastrais. Em caso de erro, transbordo para atendente humano.</td><td>Processamento em background.</td></tr>
+   <tr><td class="num">Wait</td><td><b>Espera de análises</b></td><td>Interno</td><td>"Aguarde um momento, por favor. Estamos realizando algumas análises e processos necessários para seguir com a sua contratação de crédito."</td><td>Mensagem estática de espera.</td></tr>
+   <tr><td class="num">7</td><td><b>Envio de OTP por SMS</b></td><td><span class="rota">ROTA 4</span> Iniciar login via OTP</td><td>Mensagem 1: "Confirmação de segurança: Enviamos um código para o celular informado. Aguarde um instante. Se você já recebeu, clique em 'Recebi'. Se ainda não recebeu, clique em 'Reenviar'."<br>Mensagem 2: "Confirmação de segurança: Digite o código recebido por SMS no seu celular para verificar sua conta e prosseguir."</td><td>[Recebi], [Não Recebi], depois texto livre com o código.</td></tr>
+   <tr><td class="num">8</td><td><b>Validação de OTP</b></td><td><span class="rota">ROTA 5</span> Login via OTP</td><td>Autentica a sessão do tomador na API.</td><td>Processamento em background.</td></tr>
+   <tr><td class="num">9a</td><td><b>Criação da proposta</b></td><td><span class="rota">ROTA 6a</span> Obter ofertas de empréstimo</td><td>Proposta gerada a partir da simulação aprovada.</td><td>Transição automática.</td></tr>
+   <tr><td class="num">OptIn</td><td><b>Opt-in de condições</b></td><td>Interno</td><td>"Condições do Empréstimo: As condições da contratação do seu Crédito do Trabalhador estão descritas nos Termos de Condições. Ao continuar, você concorda com todas as condições apresentadas"</td><td>[Continuar], [Ver Termos de Condições], [Voltar]. Tag <code>OFFERS OPT_IN</code>.</td></tr>
+   <tr><td class="num">Flows</td><td><b>Cadastro complementar</b></td><td>Plataforma conversacional</td><td>Pessoais: RG, órgão expedidor, UF do RG, gênero, estado civil.<br>Residenciais: CEP, endereço, número, complemento, bairro, cidade, estado.<br>Bancários: tipo de conta, banco, agência, conta, dígito.</td><td>Formulário em tela única, [Próximo].</td></tr>
+   <tr><td class="num">9b</td><td><b>Atualização da proposta</b></td><td><span class="rota">ROTA 6b</span> <span class="tag t-warn">EM AJUSTE</span> Atualizar dados do empréstimo</td><td>Persistência dos dados completos na proposta.</td><td>Processamento em background.</td></tr>
+   <tr><td class="num">Doc</td><td><b>Escolha de documento</b></td><td>Interno</td><td>"Ótimo! Agora precisamos que você envie seu documento. Qual deles você deseja enviar?"</td><td>[RG (antigo)], [RG (novo)], [RG Digital], [CNH], [CNH Digital].</td></tr>
+   <tr><td class="num">10</td><td><b>Foto da frente</b></td><td><span class="rota">ROTA 7</span> Upload de documento</td><td>"Ótimo! Agora, por favor, envie a foto da frente do seu documento. Certifique-se de que esteja nítida, iluminada e sem cortes."</td><td>Upload de imagem.</td></tr>
+   <tr><td class="num">11</td><td><b>Foto do verso</b></td><td><span class="rota">ROTA 7</span></td><td>"Perfeito! Agora, por favor, envie a foto do verso do seu documento. Certifique-se de que esteja nítida, iluminada e sem cortes."</td><td>Upload de imagem.</td></tr>
+   <tr><td class="num">17</td><td><b>Documento PDF (digital)</b></td><td><span class="rota">ROTA 7</span></td><td>"Ótimo! Agora, por favor, envie o arquivo digital do seu documento em formato PDF. Certifique-se de que o arquivo esteja completo e legível para seguirmos com a análise."</td><td>Upload de arquivo PDF.</td></tr>
+   <tr><td class="num">12</td><td><b>Comprovante de renda</b></td><td><span class="rota">ROTA 7</span></td><td>"Agora, por favor, envie o seu comprovante de renda (holerite, contracheque, etc.). Você pode enviar o arquivo ou tirar uma foto."<br>Orientações: emitido nos últimos 30 dias, completo e nítido, JPEG/PNG/PDF até 5MB, sem flash, câmera traseira.</td><td>Upload de foto ou PDF.</td></tr>
+   <tr><td class="num">13</td><td><b>Revisão final</b></td><td><span class="rota">ROTA 8</span> Resume a simulação vigente</td><td>"Confirmação de contratação: Antes de finalizar, revise atentamente todas as informações do seu contrato. Após a confirmação, não será mais possível alterar dados, condições ou valores informados. Deseja prosseguir com a contratação? {{Exibe Dados}}"</td><td>[Prosseguir], [Voltar].</td></tr>
+   <tr><td class="num">14</td><td><b>Formalização</b></td><td><span class="rota">ROTA 9</span> Efetiva formalização, esteira de qualidade</td><td>"Por favor, aguarde até a finalização desta etapa. Isso pode levar apenas alguns instantes."<br>Configura o canal de recebimento do token como WhatsApp.</td><td>Processamento em background.</td></tr>
+   <tr><td class="num">Info</td><td><b>Parceria e suporte</b></td><td>Informativo</td><td>"Parceria BRP e Gooroo Crédito: O BRP e a Gooroo atuam em parceria... Canais: Tel (11) 4003-7876, Whats (11) 5039-6825, E-mail, 09h às 18h."</td><td>Mensagem institucional passiva.</td></tr>
+   <tr><td class="num">15</td><td><b>Biometria facial</b></td><td><span class="rota">ROTA 10</span> Checa pendências documentais após formalização</td><td>"Validação facial: Aguarde a validação. Antes de assinar o contrato, abra a câmera e realize a validação facial."</td><td>Link externo. Retorno 200 segue. Qualquer erro transborda para atendente.</td></tr>
+   <tr><td class="num">Wait</td><td><b>Espera de emissão</b></td><td>Interno</td><td>"Estamos validando seus dados e realizando as confirmações de segurança necessárias para a emissão do seu contrato. Por favor, aguarde alguns instantes."</td><td>Mensagem estática de espera.</td></tr>
+   <tr><td class="num">16</td><td><b>Assinatura Clicksign</b></td><td><span class="rota">ROTA 10</span></td><td>"Assinatura do contrato: Instruções: Clique no link abaixo para acessar o seu contrato. Leia tudo atentamente e, ao final, clique em 'Assinar' para prosseguir. Em seguida, você receberá um código de 6 dígitos no seu WhatsApp, enviado pelo contato da Clicksign... Link: {{link}}"</td><td>Link externo e botão [Prosseguir]. STATUS diferente de 2 OK vai para atendente.</td></tr>
+   <tr><td class="num">16.A</td><td><b>Sucesso na assinatura</b></td><td>Conclusão</td><td>"Contrato assinado com sucesso! Agora é só aguardar a aprovação, que será feita pelo nosso time de crédito. Para acessar seu painel do cliente, clique no link abaixo: [link do painel]"</td><td>Fim da jornada.</td></tr>
+   <tr><td class="num">16.B</td><td><b>Timeout de assinatura</b></td><td><span class="rota">ROTA 10</span></td><td>Acionado se passar 1 minuto sem assinatura: "Não identificamos a assinatura do seu contrato... Instruções: Clique no link do contrato enviado anteriormente..."</td><td>[Prosseguir].</td></tr>
+  </tbody></table></div>
+ <div class="note warn"><b>Pendências no próprio mapa.</b> As rotas 1 (termos) e 6b estão marcadas como "em ajuste". Qualquer desenho TO BE que dependa delas precisa esperar o contrato final dessas APIs.</div>
+</div></div></section>
+<section class="tab-panel" id="panel-diagnostico" role="tabpanel" aria-labelledby="tab-diagnostico"><div class="section" id="diagnostico"><div class="in">
+ <div class="sh"><div class="sh-num">3</div><div class="sh-eyebrow">Diagnóstico</div></div>
+ <h2>Pontos críticos e atritos</h2>
+ <h3>Conflito de canal: WhatsApp dentro de um fluxo RCS <span class="tag t-info">Relatório</span></h3>
+ <div class="grid2">
+  <div class="card"><h4><span class="tag t-bad">Crítico</span> Token na Clicksign via WhatsApp</h4><p>Passos 16 e 16.B dizem que o código de 6 dígitos chega no WhatsApp da Clicksign. Quem contrata pelo Google Mensagens ou Samsung Mensagens é empurrado para outro app, com risco de desconfiança (parece phishing) e abandono.</p></div>
+  <div class="card"><h4><span class="tag t-bad">Crítico</span> Canal do token fixo em WhatsApp</h4><p>O passo 14 define o canal de recebimento do token como WhatsApp. No RCS, a rota precisa ser parametrizada para outro canal, ou a assinatura precisa ser resolvida de forma integrada.</p></div>
+  <div class="card"><h4><span class="tag t-bad">Crítico</span> WhatsApp Flows sem equivalente</h4><p>Cadastro básico e complementar usam Flows, recurso proprietário da Meta. O RCS não tem formulário nativo dentro do chat.</p></div>
+ </div>
+ <h3>Gargalos de conversão <span class="tag t-info">Relatório</span></h3>
+ <div class="grid2">
+  <div class="card"><h4><span class="tag t-bad">Alto</span> Timeout de 1 minuto</h4><p>Em 60 segundos o trabalhador precisaria abrir o link, carregar o contrato, ler IOF, CET e seguro, esperar o código externo, digitar, assinar e voltar ao chat. A cobrança após 1 minuto soa como falha do sistema.</p></div>
+  <div class="card"><h4><span class="tag t-warn">Médio</span> Documentos em sequência</h4><p>Até 3 envios seguidos (frente, verso, renda de 30 dias) com instruções densas em texto. Formato não reconhecido derruba o cliente para atendimento humano.</p></div>
+  <div class="card"><h4><span class="tag t-bad">Alto</span> Seis trocas de contexto</h4><p>RCS, SMS, navegador (facial), navegador (Clicksign), WhatsApp, e volta ao RCS. O relatório estima perda de 15% a 25% por quebra de app no funil de crédito móvel. <span class="tag t-warn">Validar</span> com dados reais da GooRoo, pois a estimativa não cita fonte.</p></div>
+  <div class="card"><h4><span class="tag t-warn">Médio</span> Balões de espera</h4><p>Três mensagens existem só para dizer "aguarde" (análises, formalização, emissão). Não informam nada e aumentam a lentidão percebida.</p></div>
+ </div>
+ <h3>Achados adicionais <span class="tag t-ok">Complemento</span></h3>
+ <div class="grid2">
+  <div class="card"><h4>Troca de número ignora o canal</h4><p>No RCS, a conversa já está atrelada ao número do aparelho. Permitir "Alterar número" cria um OTP para um telefone que não é o do chat. Vale confirmar com Risco se isso é regra de negócio ou herança do WhatsApp.</p></div>
+  <div class="card"><h4>Texto livre para valor monetário</h4><p>Passos 2 e 19 pedem o valor digitado. Sem máscara e sem validação no chat, entradas como "8.500", "8500,00" ou "oito mil" geram erro. Precisa de parser tolerante e mensagem de correção clara.</p></div>
+  <div class="card"><h4>Cinco mensagens de termos</h4><p>O passo 18 fragmenta IOF, juros, CET, carência e seguro em 5 balões, cada um com 2 a 3 botões. A consequência é rolagem longa e botões antigos ainda clicáveis na conversa.</p></div>
+  <div class="card"><h4>Seguro prestamista dentro da cascata</h4><p>A escolha "Continuar com Seguro" ou "sem Seguro" fica como o último de cinco blocos. É decisão com efeito financeiro e merece destaque próprio e registro explícito.</p></div>
+  <div class="card"><h4>Opt-in por "Continuar"</h4><p>O aceite das condições é um clique em botão com a tag <code>OFFERS OPT_IN</code>. Para auditoria, convém guardar o identificador do clique, data e hora e a versão dos termos exibidos.</p></div>
+  <div class="card"><h4>Dados sensíveis no canal</h4><p>RG, CNH, holerite e CPF trafegam em mensagens de negócio. Esse tráfego passa por agregador e operadora. Tratar com DPO antes do go-live (ver Riscos).</p></div>
+ </div>
+</div></div><div class="section" id="rcs"><div class="in">
+ <div class="sh"><div class="sh-num">3</div><div class="sh-eyebrow">Realidade do RCS</div></div>
+ <h2>O que cabe e o que não cabe no canal</h2>
+ <p class="sub">Todo o TO BE abaixo respeita esta régua. Valores seguem a documentação do RCS Business Messaging do Google. <span class="tag t-warn">Validar</span> com o agregador e as operadoras, porque alguns limites variam por parceiro.</p>
+ <div class="lim">
+  <div><b>3.072</b>caracteres em mensagem de texto</div>
+  <div><b>2 a 10</b>cartões em um carrossel</div>
+  <div><b>25</b>caracteres no rótulo de botão ou resposta sugerida</div>
+  <div><b>4</b>botões por Rich Card (até 11 chips soltos por mensagem)</div>
+  <div><b>200 / 2.000</b>caracteres de título / descrição de card</div>
+  <div><b>~100 MB</b>por arquivo de mídia</div>
+ </div>
+ <h3>Comparativo WhatsApp e RCS <span class="tag t-info">Relatório</span> <span class="tag t-ok">Complemento</span></h3>
+ <div class="tw"><table class="wide">
+  <thead><tr><th>Dimensão</th><th>WhatsApp Business (Meta)</th><th>RCS Business Messaging</th><th>Implicação no desenho GooRoo</th></tr></thead>
+  <tbody>
+   <tr><td><b>Cobrança</b></td><td>Por mensagem de serviço entregue. Penaliza multi-bubble.</td><td>Por tipo de mensagem: básica (texto curto), única/rica (texto longo, mídia, card) ou sessão conversacional, conforme operadora e agregador.</td><td>Unificar em Rich Card tende a gerar menos balões. O custo final depende da tabela comercial. <span class="tag t-warn">Validar</span></td></tr>
+   <tr><td><b>Componentes</b></td><td>Texto, lista (até 10 itens), botões de resposta (até 3).</td><td>Rich Card, carrossel (2 a 10 cards), respostas sugeridas e ações sugeridas.</td><td>Empregadores e parcelas viram carrossel. Menos menus de texto.</td></tr>
+   <tr><td><b>Formulários</b></td><td>WhatsApp Flows.</td><td>Não existe formulário nativo no chat. Alternativa: link aberto em webview dentro do app de mensagens, ou perguntas em sequência.</td><td>Cadastro vira página web leve e autenticada por token de sessão.</td></tr>
+   <tr><td><b>Ações</b></td><td>Respostas de texto por botão, link, ligar.</td><td>Abrir URL, discar, ver ou compartilhar localização, criar evento de calendário, resposta sugerida.</td><td>Suporte com um toque (discar). Contrato e painel por abrir URL.</td></tr>
+   <tr><td><b>Identidade</b></td><td>Selo de verificação restrito.</td><td>Remetente verificado com nome, logo e cores da marca.</td><td>Reforça confiança ao pedir RG, CNH e holerite.</td></tr>
+   <tr><td><b>Mídia</b></td><td>Compressão de imagem. Documentos até 100 MB.</td><td>Arquivos de até ~100 MB. O usuário anexa pelo próprio app de mensagens.</td><td>Fotos mais nítidas ajudam o OCR. <span class="tag t-warn">Validar</span> o limite exato (o relatório original citava 105 MB).</td></tr>
+   <tr><td><b>Dispositivos sem RCS</b></td><td>Não se aplica.</td><td>Nem todo aparelho ou operadora tem RCS. Existe consulta de capacidade e fallback para SMS.</td><td>A jornada precisa de plano B para quem não recebe cards. <span class="tag t-ok">Complemento</span></td></tr>
+   <tr><td><b>Mensagens enviadas</b></td><td>Não editáveis.</td><td>Não editáveis. Botões antigos continuam clicáveis.</td><td>O backend precisa tratar clique obsoleto de forma idempotente. <span class="tag t-ok">Complemento</span></td></tr>
+  </tbody></table></div>
+ <h3 id="regua">Régua de viabilidade <span class="tag t-ok">Complemento</span></h3>
+ <div class="two">
+  <div class="card"><h4 class="y">Existe no RCS</h4><ul>
+   <li>Texto, Rich Card e carrossel com imagem, título, descrição e botões.</li>
+   <li>Respostas sugeridas com dado de retorno (postback) para o bot.</li>
+   <li>Ação de abrir URL, no navegador ou em webview dentro do app (comportamento depende do aparelho e do agregador).</li>
+   <li>Ação de discar.</li>
+   <li>Usuário enviando foto ou arquivo pelo anexo do app.</li>
+   <li>Indicador de digitação e confirmação de leitura enviados pelo bot.</li>
+   <li>Remetente verificado.</li>
+   <li>Eventos de entrega e leitura para métricas.</li>
+  </ul></div>
+  <div class="card"><h4 class="n">Não existe no RCS</h4><ul>
+   <li>Formulário nativo com campos, máscara e validação dentro do chat.</li>
+   <li>Botão do bot que abre câmera ou galeria. O usuário usa o anexo do próprio app.</li>
+   <li>Auto-preenchimento de código por SMS Retriever (é para SMS, não para mensagem RCS).</li>
+   <li>Ações do tipo "salvar contrato" ou "abrir carteira".</li>
+   <li>A página web enviar mensagem direto ao chat. O caminho é página, backend, webhook, nova mensagem do bot.</li>
+   <li>Editar ou desativar um card depois de enviado.</li>
+   <li>Garantia de negrito ou formatação rica no texto.</li>
+   <li>Criptografia ponta a ponta em mensagem de negócio (A2P). <span class="tag t-warn">Validar</span> com segurança</li>
+  </ul></div>
+ </div>
+</div></div></section>
+<section class="tab-panel" id="panel-tobe" role="tabpanel" aria-labelledby="tab-tobe"><div class="section" id="tobe"><div class="in">
+ <div class="sh"><div class="sh-num">4</div><div class="sh-eyebrow">Redesenho TO BE</div></div>
+ <h2>A jornada GooRoo pensada para RCS</h2>
+ <p class="sub">Seis fases. Cada uma mostra o problema, a solução, a viabilidade no canal e o que precisa de teste. Os mockups são ilustrativos, com variáveis no lugar dos valores reais.</p><nav class="toc" aria-label="Neste capítulo"><button type="button" data-go="tobe/fase1">Fase 1</button><button type="button" data-go="tobe/fase2">Fase 2</button><button type="button" data-go="tobe/fase3">Fase 3</button><button type="button" data-go="tobe/fase4">Fase 4</button><button type="button" data-go="tobe/fase5">Fase 5</button><button type="button" data-go="tobe/fase6">Fase 6</button></nav>
+
+ <article class="tb" id="fase1"><header><h3>Fase 1. Oferta e personalização</h3><span><span class="tag t-info">Relatório</span> <span class="tag t-ok">Nativo RCS</span></span></header>
+  <div class="cols">
+   <div><h5>Problema atual</h5><p>Textos longos, 3 menus de botões, e os termos quebrados em 5 mensagens.</p>
+    <h5 style="margin-top:14px">Solução</h5><ul>
+     <li><b>Carrossel por empregador.</b> Cada card traz logo, valor liberado em destaque, parcelas e o botão "Contratar oferta".</li>
+     <li><b>Card de resumo</b> com Contratar, Alterar valor e Alterar parcelas.</li>
+     <li><b>Termos em um card</b> com IOF, juros, CET e carência, e botão que abre o documento completo.</li>
+     <li><b>Seguro prestamista fora do resumo.</b> Pergunta própria, com "Com seguro" e "Sem seguro" e registro do clique. <span class="tag t-ok">Complemento</span></li>
+     <li><b>Valor digitado:</b> aceitar formatos variados e confirmar de volta ("Entendi R$ X. Está certo?"). <span class="tag t-ok">Complemento</span></li>
+    </ul>
+    <h5 style="margin-top:14px">Atenção</h5><p>Com um único empregador, usar um Rich Card simples. Carrossel exige no mínimo 2 cartões.</p></div>
+   <div><figure class="mk" style="margin:0"><div class="phone">
+     <div class="hd"><span class="av">GR</span>GooRoo Crédito <span class="ok">✓ verificado</span></div>
+     <div class="bub">Encontramos ofertas para você. Escolha a empresa:</div>
+     <div class="car">
+      <div class="rc"><div class="img">EMPREGADOR 1</div><div class="tx"><b>Até R$ {{1}}</b><div>Receba: {{3}}<br>Pague em: {{4}}x de R$ {{5}}</div></div><span class="bt">Contratar oferta</span><span class="bt">Alterar valor</span></div>
+      <div class="rc"><div class="img">EMPREGADOR 2</div><div class="tx"><b>Até R$ {{1}}</b><div>Receba: {{3}}<br>Pague em: {{4}}x de R$ {{5}}</div></div><span class="bt">Contratar oferta</span><span class="bt">Alterar valor</span></div>
+     </div>
+     <div class="chips"><span class="chip">Alterar parcelas</span><span class="chip">Voltar</span></div>
+    </div><figcaption><b>Carrossel de ofertas.</b> Dois cards visíveis, deslize para o próximo.</figcaption></figure></div>
+   <div><figure class="mk" style="margin:0"><div class="phone">
+     <div class="hd"><span class="av">GR</span>GooRoo Crédito <span class="ok">✓ verificado</span></div>
+     <div class="rc"><div class="tx"><b>Condições do empréstimo</b><div>IOF: R$ 327,38<br>Juros: 7,99% a.m. (151,53% a.a.)<br>CET: 10,75% a.m. (187,63% a.a.)<br>Carência: 76 dias</div></div><span class="bt">Continuar</span><span class="bt">Ver termos completos</span><span class="bt">Voltar</span></div>
+     <div class="bub">Quer incluir o seguro prestamista de R$ {{1}}?</div>
+     <div class="chips"><span class="chip">Com seguro</span><span class="chip">Sem seguro</span></div>
+    </div><figcaption><b>Termos e seguro.</b> Valores do fluxo mapeado, usados como exemplo. Ao tocar em "Continuar", registrar o aceite (<code>OFFERS OPT_IN</code>).</figcaption></figure></div>
+  </div>
+ </article>
+
+ <article class="tb" id="fase2"><header><h3>Fase 2. Identificação e autenticação</h3><span><span class="tag t-info">Relatório</span> <span class="tag t-warn">Validar com Risco</span></span></header>
+  <div class="cols">
+   <div><h5>Problema atual</h5><p>OTP por SMS, depois pergunta "Recebi?" antes de pedir o código, e um balão de espera.</p>
+    <h5 style="margin-top:14px">Solução</h5><ul>
+     <li>Disparar o OTP e pedir o código na mesma mensagem, sem o passo "Recebi". Manter só um botão "Reenviar código".</li>
+     <li>Trocar o balão "Aguarde um momento" pelo indicador de digitação do RCS.</li>
+     <li>Se a conversa RCS puder dispensar o segundo fator, a decisão é de Risco e Segurança. O relatório original afirmou que o número do chip já autentica. Isso não substitui OTP para contrato de crédito sem aprovação formal.</li>
+    </ul>
+    <h5 style="margin-top:14px">Ajuste de fidelidade</h5><p>Auto-preenchimento por SMS Retriever e campo com máscara não existem no chat RCS. O usuário digita os 6 números como mensagem.</p></div>
+   <div><h5>Complementos</h5><ul>
+     <li>Limitar tentativas e reenvios, com mensagem clara ao atingir o limite.</li>
+     <li>Definir a validade do código e comunicá-la no texto.</li>
+     <li>Se o usuário informar um número diferente do aparelho, avisar que o código vai para outro telefone. <span class="tag t-ok">Complemento</span></li>
+    </ul></div>
+  </div>
+ </article>
+
+ <article class="tb" id="fase3"><header><h3>Fase 3. Dados cadastrais e bancários</h3><span><span class="tag t-info">Relatório</span> <span class="tag t-warn">Webview: validar</span></span></header>
+  <div class="cols">
+   <div><h5>Problema atual</h5><p>Dois formulários em WhatsApp Flows, sem equivalente no RCS.</p>
+    <h5 style="margin-top:14px">Solução: página web leve em webview</h5><ul>
+     <li>Uma ação de abrir URL leva à página de cadastro, com os 3 grupos de dados em telas curtas.</li>
+     <li>CEP completa o endereço via ViaCEP. Dígito de agência e conta validado na própria página.</li>
+     <li>URL com token de sessão de uso único e curta validade, nunca CPF na URL.</li>
+     <li>Ao concluir, a página chama o backend. O backend dispara o webhook e o bot envia a próxima mensagem. A página não escreve no chat.</li>
+     <li>Alternativa de fallback: as mesmas perguntas em sequência, uma por mensagem, para aparelhos que abrem só no navegador. <span class="tag t-ok">Complemento</span></li>
+    </ul></div>
+   <div><h5>Payload de referência (ajustado)</h5>
+    <pre id="payload">{
+  "text": "Preencher dados",
+  "postbackData": "ONBOARDING_START",
+  "openUrlAction": {
+    "url": "https://credito.gooroocredito.com.br/onboarding?s={{token_de_sessao}}",
+    "application": "WEBVIEW",
+    "webviewViewMode": "FULL"
+  }
+}</pre>
+    <button class="btn" id="copyPayload" type="button">Copiar payload</button>
+    <p style="font-size:13.5px;color:var(--muted);margin-top:10px">O rótulo original, "Preencher Dados Cadastrais", tem 26 caracteres e passa o limite de 25. Nomes de campos conforme a API do RBM. <span class="tag t-warn">Validar</span> suporte a webview com o agregador.</p></div>
+  </div>
+ </article>
+
+ <article class="tb" id="fase4"><header><h3>Fase 4. Documentos e comprovante de renda</h3><span><span class="tag t-info">Relatório</span> <span class="tag t-ok">Nativo RCS</span></span></header>
+  <div class="cols">
+   <div><h5>Problema atual</h5><p>Três envios sequenciais, regras longas em texto puro, e falha leva ao atendente.</p>
+    <h5 style="margin-top:14px">Solução</h5><ul>
+     <li>Um Rich Card de orientação com ilustração: documento inteiro, bem iluminado, sem flash.</li>
+     <li>Chips para o tipo de documento. O usuário envia a foto ou o PDF pelo anexo do próprio app.</li>
+     <li>RG Digital e CNH Digital: pedir o PDF exportado do app oficial, em uma só mensagem.</li>
+     <li>Comprovante de renda em card próprio com as regras resumidas em 4 itens.</li>
+     <li><b>Opção B:</b> página de captura em webview com moldura guia e checagem de nitidez antes do envio. <span class="tag t-ok">Complemento</span> <span class="tag t-warn">Validar</span> permissão de câmera na webview.</li>
+     <li>Confirmar cada recebimento com uma frase curta ("Frente recebida") e mostrar o que falta.</li>
+    </ul>
+    <h5 style="margin-top:14px">Atenção</h5><p>Não existe botão do bot que abre a câmera. O texto precisa mandar tocar no clipe ou no ícone de câmera do app.</p></div>
+   <div><figure class="mk" style="margin:0"><div class="phone">
+     <div class="hd"><span class="av">GR</span>GooRoo Crédito <span class="ok">✓ verificado</span></div>
+     <div class="rc"><div class="img">ENVIO DE DOCUMENTO</div><div class="tx"><b>Foto nítida, sem cortes</b><div>Documento inteiro na imagem, com boa luz e sem flash. Use a câmera traseira.</div></div></div>
+     <div class="bub">Qual documento você vai enviar?</div>
+     <div class="chips"><span class="chip">RG (antigo)</span><span class="chip">RG (novo)</span><span class="chip">RG Digital</span><span class="chip">CNH</span><span class="chip">CNH Digital</span></div>
+     <div class="bub" style="margin-top:8px">Toque no clipe e envie a foto da <b>frente</b>.</div>
+    </div><figcaption><b>Orientação e escolha do documento.</b> Os 5 chips cabem no limite de 11.</figcaption></figure></div>
+  </div>
+ </article>
+
+ <article class="tb" id="fase5"><header><h3>Fase 5. Revisão, biometria e assinatura</h3><span><span class="tag t-info">Relatório</span> <span class="tag t-warn">Validar com Clicksign</span></span></header>
+  <div class="cols">
+   <div><h5>Problema atual</h5><p>Timeout de 1 minuto, referência ao WhatsApp da Clicksign e dois links externos desconectados.</p>
+    <h5 style="margin-top:14px">Solução</h5><ul>
+     <li>Tirar toda menção ao WhatsApp. O contrato é fechado no canal oficial da GooRoo.</li>
+     <li>Card de confirmação final com os dados do contrato e botão "Validar meu rosto".</li>
+     <li>O motor de biometria avisa o backend por webhook. Só então o bot envia o card "Seu contrato está pronto" com o botão "Assinar contrato".</li>
+     <li>Webhook da Clicksign avisa a assinatura. O bot confirma sozinho, sem pedir "Prosseguir".</li>
+     <li>Trocar o timeout de 1 minuto por uma régua de lembretes (abaixo).</li>
+    </ul></div>
+   <div><h5>Pontos a confirmar</h5><ul>
+     <li>Como a Clicksign entrega o token: por SMS, e-mail ou WhatsApp, e se isso é configurável por contrato. O relatório original sugeriu "certificado digital", mas o fluxo mapeado descreve assinatura eletrônica com código. <span class="tag t-warn">Validar</span></li>
+     <li>Se a validação facial e a página de assinatura funcionam em webview, com câmera liberada. Senão, abrir no navegador.</li>
+     <li>Se o usuário que volta ao chat encontra o estado correto (assinado, pendente ou expirado).</li>
+    </ul></div>
+   <div><figure class="mk" style="margin:0"><div class="phone">
+     <div class="hd"><span class="av">GR</span>GooRoo Crédito <span class="ok">✓ verificado</span></div>
+     <div class="rc"><div class="img">PRÓXIMO PASSO</div><div class="tx"><b>Valide seu rosto</b><div>Antes de assinar, precisamos confirmar que é você. Leva poucos segundos.</div></div><span class="bt">Validar meu rosto</span></div>
+     <div class="rc"><div class="img">CONTRATO PRONTO</div><div class="tx"><b>Seu contrato está pronto para assinatura</b><div>Leia com atenção e conclua a assinatura pelo botão abaixo.</div></div><span class="bt">Assinar contrato</span><span class="bt">Falar com atendente</span></div>
+    </div><figcaption><b>Dois cards em sequência.</b> O segundo só aparece depois do aviso do motor de biometria.</figcaption></figure></div>
+  </div>
+  <h3 style="margin-top:26px">Régua de lembretes no lugar do timeout <span class="tag t-info">Relatório</span></h3>
+  <div class="ladder">
+   <div class="lad"><b class="t">15 min</b>Lembrete amigável com botão para retomar o link.</div>
+   <div class="lad"><b class="t">2 h</b>Alerta de expiração da reserva de crédito. Usar só se a reserva realmente expira. <span class="tag t-warn">Validar</span></div>
+   <div class="lad"><b class="t">24 h</b>Aviso de encerramento da proposta, com caminho para retomar depois.</div>
+  </div>
+  <div class="note warn"><b>Antes de ligar a régua.</b> Mensagens proativas pedem consentimento registrado, horário permitido de contato e checagem de custo por mensagem no contrato com o agregador. Parar a régua assim que a assinatura for confirmada.</div>
+ </article>
+
+ <article class="tb" id="fase6"><header><h3>Fase 6. Pós-contratação e suporte</h3><span><span class="tag t-info">Relatório</span> <span class="tag t-ok">Nativo RCS</span></span></header>
+  <div class="cols">
+   <div><h5>Problema atual</h5><p>Texto plano com telefone e WhatsApp do suporte, sem ação direta.</p>
+    <h5 style="margin-top:14px">Solução</h5><ul>
+     <li>Rich Card de sucesso com protocolo e próximo passo (aprovação pelo time de crédito).</li>
+     <li>Botão "Abrir painel" (abrir URL).</li>
+     <li>Botão "Ligar para suporte" (discar), com o número em texto também.</li>
+     <li>Informar o horário de atendimento (09h às 18h) e o e-mail de suporte.</li>
+     <li>Só prometer data de crédito na conta se a API retornar essa previsão. <span class="tag t-warn">Validar</span></li>
+    </ul></div>
+   <div><figure class="mk" style="margin:0"><div class="phone">
+     <div class="hd"><span class="av">GR</span>GooRoo Crédito <span class="ok">✓ verificado</span></div>
+     <div class="rc"><div class="img">CONTRATO ASSINADO</div><div class="tx"><b>Tudo certo!</b><div>Protocolo {{protocolo}}. Agora o time de crédito faz a aprovação.</div></div><span class="bt">Abrir painel</span><span class="bt">Ligar para suporte</span></div>
+     <div class="bub">Atendimento de 09h às 18h. Tel (11) 4003-7876.</div>
+    </div><figcaption><b>Card de conclusão.</b> Protocolo e dados do painel vêm das rotas de API.</figcaption></figure></div>
+  </div>
+ </article>
+
+ <h3>Boas práticas transversais <span class="tag t-ok">Complemento</span></h3>
+ <div class="grid2">
+  <div class="card"><h4>Verificar capacidade RCS no início</h4><p>Consultar se o número recebe RCS. Quem não recebe segue por SMS com link curto para a mesma jornada em página web.</p></div>
+  <div class="card"><h4>Estado da jornada no servidor</h4><p>Guardar o último passo concluído por CPF e sessão. Quem volta no dia seguinte retoma de onde parou, sem refazer o cadastro.</p></div>
+  <div class="card"><h4>Cliques antigos</h4><p>Todo botão leva o identificador do passo no dado de retorno. Se o clique for de um passo já vencido, responder com orientação curta e reapresentar o card atual.</p></div>
+  <div class="card"><h4>Indicador de digitação</h4><p>Usar nas esperas dos passos 6, 14 e na emissão do contrato, no lugar dos balões "Aguarde". Se a espera passar de alguns segundos, uma única mensagem informando.</p></div>
+  <div class="card"><h4>Saída para humano visível</h4><p>Em todo card crítico, um botão "Falar com atendente". Hoje o transbordo só acontece quando algo dá erro.</p></div>
+  <div class="card"><h4>Texto curto nos botões</h4><p>Rótulos de até 25 caracteres, sem depender de emoji. Em aparelhos sem RCS, os cards viram SMS e perdem os botões.</p></div>
+ </div>
+</div></div></section>
+<section class="tab-panel" id="panel-priorizacao" role="tabpanel" aria-labelledby="tab-priorizacao"><div class="section" id="priorizacao"><div class="in">
+ <div class="sh"><div class="sh-num">5</div><div class="sh-eyebrow">Priorização</div></div>
+ <h2>Matriz de melhorias</h2>
+ <p class="sub">As oito primeiras linhas vêm do relatório. As demais foram adicionadas para cobrir lacunas do canal.</p><nav class="toc" aria-label="Neste capítulo"><button type="button" data-go="priorizacao/priorizacao">Matriz</button><button type="button" data-go="priorizacao/medir">Indicadores</button></nav>
+ <div class="tw"><table class="wide">
+  <thead><tr><th>#</th><th>Iniciativa</th><th>Origem</th><th>Impacto na conversão</th><th>Complexidade</th><th>Prioridade</th></tr></thead>
+  <tbody>
+   <tr><td class="num">1</td><td><b>Substituir menção de WhatsApp por RCS ou link direto</b><br><small>Correção de canal e copy</small></td><td><span class="tag t-info">Relatório</span></td><td><span class="tag t-bad">Crítico</span> Elimina clientes perdidos na troca de app.</td><td>Baixa. Ajuste de copy e parâmetro de API.</td><td><span class="tag t-bad">P1</span></td></tr>
+   <tr><td class="num">2</td><td><b>Flexibilizar o timeout de assinatura</b><br><small>Lógica de negócio e UX</small></td><td><span class="tag t-info">Relatório</span></td><td><span class="tag t-bad">Crítico</span> 1 minuto derruba quem está lendo.</td><td>Baixa. De 1 min para 15 a 30 min com webhook assíncrono.</td><td><span class="tag t-bad">P1</span></td></tr>
+   <tr><td class="num">3</td><td><b>Eliminar balões transitórios</b><br><small>Trocar por indicador de digitação</small></td><td><span class="tag t-info">Relatório</span></td><td><span class="tag t-warn">Médio</span> Menos latência percebida.</td><td>Baixa.</td><td><span class="tag t-bad">P1</span></td></tr>
+   <tr><td class="num">4</td><td><b>Substituir WhatsApp Flows por webview</b><br><small>Arquitetura técnica</small></td><td><span class="tag t-info">Relatório</span></td><td><span class="tag t-bad">Crítico</span> Sem isso o canal não é viável.</td><td>Média. Página responsiva nova ou reaproveitada.</td><td><span class="tag t-bad">P1</span></td></tr>
+   <tr><td class="num">5</td><td><b>Carrossel de ofertas e Rich Cards</b><br><small>Experiência visual</small></td><td><span class="tag t-info">Relatório</span></td><td><span class="tag t-ok">Alto</span> Comparação clara entre empregadores e parcelas.</td><td>Média. Payload de card e carrossel.</td><td><span class="tag t-warn">P2</span></td></tr>
+   <tr><td class="num">6</td><td><b>Abrir URL e discar nativos</b><br><small>Ações sugeridas</small></td><td><span class="tag t-info">Relatório</span></td><td><span class="tag t-warn">Médio</span> Contato e contrato com um toque.</td><td>Baixa.</td><td><span class="tag t-warn">P2</span></td></tr>
+   <tr><td class="num">7</td><td><b>Webhook de assinatura em tempo real</b><br><small>Arquitetura de eventos</small></td><td><span class="tag t-info">Relatório</span></td><td><span class="tag t-ok">Alto</span> Some o "Prosseguir" depois de assinar.</td><td>Média. Callback da Clicksign para o webhook do bot.</td><td><span class="tag t-warn">P2</span></td></tr>
+   <tr><td class="num">8</td><td><b>Feedback imediato de qualidade do documento</b><br><small>OCR e IA</small></td><td><span class="tag t-info">Relatório</span></td><td><span class="tag t-ok">Alto</span> Evita descobrir horas depois que a foto estava escura.</td><td>Alta. Validação prévia de imagem antes da esteira.</td><td><span class="tag t-gray">P3</span></td></tr>
+   <tr><td class="num">9</td><td><b>Spike de webview</b><br><small>Câmera, cookies e retorno ao chat em Google Mensagens e Samsung Mensagens</small></td><td><span class="tag t-ok">Complemento</span></td><td><span class="tag t-bad">Crítico</span> Define se Fases 3 e 5 funcionam como desenhadas.</td><td>Baixa a média. Teste em aparelhos reais.</td><td><span class="tag t-bad">P1</span></td></tr>
+   <tr><td class="num">10</td><td><b>Revisão LGPD e segurança do canal</b><br><small>Documentos e CPF em mensagem de negócio</small></td><td><span class="tag t-ok">Complemento</span></td><td><span class="tag t-bad">Crítico</span> Condição para ir ao ar.</td><td>Baixa. Parecer do DPO e da Segurança.</td><td><span class="tag t-bad">P1</span></td></tr>
+   <tr><td class="num">11</td><td><b>Verificação de capacidade RCS e fallback</b><br><small>SMS com link para a jornada web</small></td><td><span class="tag t-ok">Complemento</span></td><td><span class="tag t-ok">Alto</span> Cobre quem não recebe cards.</td><td>Média.</td><td><span class="tag t-bad">P1</span></td></tr>
+   <tr><td class="num">12</td><td><b>Instrumentar o funil por passo</b><br><small>Eventos de postback, entrega e leitura</small></td><td><span class="tag t-ok">Complemento</span></td><td><span class="tag t-ok">Alto</span> Mostra onde o usuário sai.</td><td>Baixa.</td><td><span class="tag t-bad">P1</span></td></tr>
+   <tr><td class="num">13</td><td><b>Tratar clique obsoleto de forma idempotente</b></td><td><span class="tag t-ok">Complemento</span></td><td><span class="tag t-warn">Médio</span> Evita estados duplicados e confusão.</td><td>Baixa a média.</td><td><span class="tag t-warn">P2</span></td></tr>
+   <tr><td class="num">14</td><td><b>Retomada de jornada por CPF</b></td><td><span class="tag t-ok">Complemento</span></td><td><span class="tag t-ok">Alto</span> Recupera quem interrompeu no meio.</td><td>Média.</td><td><span class="tag t-warn">P2</span></td></tr>
+   <tr><td class="num">15</td><td><b>Card de termos e seguro separado</b></td><td><span class="tag t-ok">Complemento</span></td><td><span class="tag t-warn">Médio</span> Clareza e registro do aceite.</td><td>Baixa. Depende do ajuste da ROTA 1 (termos).</td><td><span class="tag t-warn">P2</span></td></tr>
+  </tbody></table></div>
+</div></div><div class="section" id="medir"><div class="in">
+ <div class="sh"><div class="sh-num">5</div><div class="sh-eyebrow">Medição <span class="tag t-ok">Complemento</span></div></div>
+ <h2>O que medir para provar que melhorou</h2>
+ <p class="sub">Sem meta numérica proposta aqui. Primeiro medir o AS IS por 2 semanas, depois definir metas junto com a GooRoo.</p>
+ <div class="tw"><table class="mid">
+  <thead><tr><th>Indicador</th><th>Como medir</th><th>Fonte</th></tr></thead>
+  <tbody>
+   <tr><td><b>Conversão por etapa</b></td><td>Usuários que chegam ao passo, divididos pelos que concluem o anterior (oferta, cadastro, OTP, documentos, facial, assinatura).</td><td>Eventos do bot e rotas de API</td></tr>
+   <tr><td><b>Tempo até assinar</b></td><td>Do primeiro CPF recebido até o webhook de assinatura.</td><td>Timestamps do bot e Clicksign</td></tr>
+   <tr><td><b>Taxa de transbordo por passo</b></td><td>Quantos vão ao atendente em cada etapa e por qual erro.</td><td>Desk e logs de erro das rotas</td></tr>
+   <tr><td><b>Reprovação de documento</b></td><td>Documentos ilegíveis ou recusados, por tipo.</td><td>ROTA 7 e esteira de qualidade</td></tr>
+   <tr><td><b>Reenvio de OTP</b></td><td>Cliques em "Não recebi" e reenvios por usuário.</td><td>ROTA 4 e postbacks</td></tr>
+   <tr><td><b>Interesse nos termos</b></td><td>Cliques em "Ver termos completos" antes de continuar.</td><td>Postbacks</td></tr>
+   <tr><td><b>Cobertura de RCS</b></td><td>Percentual de números que recebem RCS e dos que caem no fallback.</td><td>Consulta de capacidade</td></tr>
+   <tr><td><b>Entrega e leitura</b></td><td>Mensagens entregues e lidas por tipo de card.</td><td>Eventos do RBM</td></tr>
+   <tr><td><b>Retomadas</b></td><td>Usuários que voltam após lembrete e concluem.</td><td>Régua e estado da jornada</td></tr>
+  </tbody></table></div>
+</div></div></section>
+<section class="tab-panel" id="panel-riscos" role="tabpanel" aria-labelledby="tab-riscos"><div class="section" id="riscos"><div class="in">
+ <div class="sh"><div class="sh-num">6</div><div class="sh-eyebrow">Riscos e perguntas abertas <span class="tag t-ok">Complemento</span></div></div>
+ <h2>O que ainda precisa de resposta</h2>
+ <div class="tw"><table class="mid">
+  <thead><tr><th>Tema</th><th>Risco ou pergunta</th><th>Quem responde</th></tr></thead>
+  <tbody>
+   <tr><td><b>Webview</b></td><td>A webview do Google Mensagens e do Samsung Mensagens libera câmera? Mantém sessão? O que acontece em aparelhos que abrem só no navegador?</td><td>Blip, agregador, teste em aparelho</td></tr>
+   <tr><td><b>Clicksign</b></td><td>O canal do token pode ser trocado? A página de assinatura funciona em webview? Há callback de assinatura?</td><td>GooRoo e Clicksign</td></tr>
+   <tr><td><b>Segurança do canal</b></td><td>Mensagem de negócio não tem criptografia ponta a ponta como conversa entre pessoas. Documentos e CPF pedem parecer do DPO. A webview com token de uso único reduz a exposição.</td><td>DPO e Segurança</td></tr>
+   <tr><td><b>Autenticação</b></td><td>O OTP continua obrigatório no RCS? Risco de troca de chip (SIM swap) com contrato de crédito.</td><td>Risco da GooRoo e BRP</td></tr>
+   <tr><td><b>Regras de crédito</b></td><td>Reserva de crédito realmente expira? Em quanto tempo? Existe previsão de liberação na conta?</td><td>GooRoo</td></tr>
+   <tr><td><b>Compliance dos termos</b></td><td>Resumo de condições em card é aceito como apresentação de CET e custos? O aceite precisa de log com versão dos termos?</td><td>Jurídico e Compliance</td></tr>
+   <tr><td><b>APIs em ajuste</b></td><td>ROTA 1 (termos) e ROTA 6b ainda mudam. Prazo de estabilização?</td><td>GooRoo (engenharia)</td></tr>
+   <tr><td><b>Custos</b></td><td>Tabela de preço do agregador por tipo de mensagem e para mensagens proativas da régua.</td><td>Blip comercial</td></tr>
+   <tr><td><b>Cobertura</b></td><td>Qual percentual da base tem RCS ativo? Muda o peso do fallback.</td><td>Agregador e operadoras</td></tr>
+  </tbody></table></div>
+</div></div><div class="section" id="ajustes"><div class="in">
+ <div class="sh"><div class="sh-num">6</div><div class="sh-eyebrow">Transparência</div></div>
+ <h2>O que foi ajustado em relação ao relatório original</h2>
+ <p class="sub">Para manter o documento fiel ao que o RCS permite, estes pontos do .md foram corrigidos ou marcados para validação.</p>
+ <div class="tw"><table class="mid">
+  <thead><tr><th>No relatório original</th><th>Neste documento</th></tr></thead>
+  <tbody>
+   <tr><td>Rótulo "Preencher Dados Cadastrais" no botão de abrir URL.</td><td>Passa o limite de 25 caracteres. Trocado por "Preencher dados".</td></tr>
+   <tr><td>Campo de OTP com máscara e SMS Retriever API.</td><td>Nenhum dos dois existe no chat RCS. O usuário digita o código como mensagem.</td></tr>
+   <tr><td>Botões nativos para câmera ou galeria.</td><td>Não existem. O usuário usa o anexo do app. Opção B com página de captura marcada para validação.</td></tr>
+   <tr><td>Ações "Salvar contrato" e "Abrir carteira".</td><td>Não fazem parte das ações sugeridas do RCS. Removidas.</td></tr>
+   <tr><td>Webview volta ao chat por postMessage.</td><td>A página avisa o backend, o backend dispara o webhook e o bot envia a mensagem seguinte.</td></tr>
+   <tr><td>Mídia de até 105 MB.</td><td>Documentação do RBM indica cerca de 100 MB. Marcado para validar com o agregador.</td></tr>
+   <tr><td>Assinatura "com seu certificado digital".</td><td>O fluxo mapeado descreve assinatura eletrônica com código. Texto do card ajustado e marcado para validar com a Clicksign.</td></tr>
+   <tr><td>Perda de 15% a 25% por troca de app.</td><td>Mantida como estimativa do relatório, sem fonte. Marcada para confirmar com dados da GooRoo.</td></tr>
+   <tr><td>Número do chip já autentica o usuário.</td><td>Tratada como hipótese a aprovar por Risco e Segurança, não como fato.</td></tr>
+   <tr><td>Rich Card sempre mais econômico.</td><td>Tende a reduzir balões, mas o custo depende do modelo comercial do agregador.</td></tr>
+  </tbody></table></div>
+ <h3>Conclusão</h3>
+ <p style="max-width:70ch">A GooRoo já tem uma esteira funcional em regras de crédito, compliance, biometria e assinatura. Para o RCS, o ganho vem de três movimentos: tirar o WhatsApp do caminho, trocar os Flows por página web leve, e substituir o timeout de 1 minuto por eventos assíncronos e lembretes. Cards, carrossel e ações nativas deixam a jornada mais clara, desde que os pontos marcados para validação passem pelos testes antes do desenho final.</p>
+</div></div></section>
+</div>
+<footer class="footer gut"><div class="in">Análise do fluxo GooRoo (Crédito do Trabalhador) no RCS. Base: mapa MindMeister do AS IS e relatório de análise macro. Valores de IOF, juros, CET e carência são do fluxo mapeado e aparecem como exemplo. Telefones e e-mails de suporte seguem o mapa original.</div></footer>
+<button class="to-top" id="toTop" type="button" aria-label="Voltar ao topo">↑</button>
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.nav-tab'));
+  var panels=[].slice.call(document.querySelectorAll('.tab-panel'));
+  function show(id,scrollTop){
+    var ok=false;
+    tabs.forEach(function(t){var on=t.getAttribute('data-tab')===id;if(on)ok=true;t.setAttribute('aria-selected',on?'true':'false');t.tabIndex=on?0:-1;});
+    if(!ok){id=tabs[0].getAttribute('data-tab');tabs[0].setAttribute('aria-selected','true');tabs[0].tabIndex=0;}
+    panels.forEach(function(p){p.classList.toggle('active',p.id==='panel-'+id);});
+    try{history.replaceState(null,'','#'+id);}catch(e){}
+    if(scrollTop){var nav=document.querySelector('.nav-wrap');window.scrollTo({top:Math.max(0,nav.offsetTop-0),behavior:'auto'});}
+    return id;
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(t.getAttribute('data-tab'),true);});
+    t.addEventListener('keydown',function(e){
+      var n=e.key==='ArrowRight'?i+1:e.key==='ArrowLeft'?i-1:-1;
+      if(n<0)return;n=(n+tabs.length)%tabs.length;tabs[n].focus();show(tabs[n].getAttribute('data-tab'),false);e.preventDefault();
+    });
+  });
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('[data-go]');if(!b)return;
+    var p=b.getAttribute('data-go').split('/');
+    show(p[0],false);
+    var el=p[1]&&document.getElementById(p[1]);
+    if(el){setTimeout(function(){el.scrollIntoView({behavior:'smooth',block:'start'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');},30);}
+  });
+  var h=(location.hash||'').replace('#','');
+  show(h,false);
+  var top=document.getElementById('toTop');
+  window.addEventListener('scroll',function(){top.classList.toggle('on',window.scrollY>600);},{passive:true});
+  top.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'});});
+
+  var q=document.getElementById('q');
+  if(q){q.addEventListener('input',function(){
+    var t=q.value.toLowerCase().trim();
+    document.querySelectorAll('#inv tbody tr').forEach(function(r){r.hidden=!!t&&r.textContent.toLowerCase().indexOf(t)===-1;});
+  });}
+  var b=document.getElementById('copyPayload');
+  if(b){b.addEventListener('click',function(){
+    var el=document.getElementById('payload');
+    function sel(){var r=document.createRange();r.selectNodeContents(el);var s=window.getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Selecionado, use Ctrl+C';}
+    try{navigator.clipboard.writeText(el.textContent).then(function(){b.textContent='Copiado';},sel);}catch(e){sel();}
+  });}
+})();
+</script>
